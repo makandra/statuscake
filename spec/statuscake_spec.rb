@@ -2,8 +2,7 @@ describe StatusCake::Client do
   let(:request_headers) do
     {
       'User-Agent' => StatusCake::Client::USER_AGENT,
-      'Api'        => TEST_API_KEY,
-      'Username'   => TEST_USERNAME,
+      'Api_key'        => TEST_API_KEY,
     }
   end
 
@@ -335,14 +334,18 @@ describe StatusCake::Client do
 
   describe '/API/Auth' do
     let(:response) do
-      {"Success"=>true,
+      {
+        "Success"=>true,
        "Details"=>
-        {"Username"=>"StatusCake",
-         "FirstName"=>"Matthew",
-         "LastName"=>"Awesomeo",
-         "Plan"=>"BUSINESS",
-         "Timezone"=>"Europe/London",
-         "CountryCode"=>"GB"}}
+        {
+          "Username"=>"StatusCake",
+          "FirstName"=>"Matthew",
+          "LastName"=>"Awesomeo",
+          "Plan"=>"BUSINESS",
+          "Timezone"=>"Europe/London",
+          "CountryCode"=>"GB"
+        }
+      }
     end
 
     it do

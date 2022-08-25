@@ -2,12 +2,10 @@ require 'statuscake'
 require 'uri'
 
 TEST_API_KEY  = 'l6OxVJilcD2cETMoNRvn'
-TEST_USERNAME = 'StatusCake'
 
 def status_cake(options = {})
   options = {
     API:      TEST_API_KEY,
-    Username: TEST_USERNAME,
   }.merge(options)
 
   stubs = Faraday::Adapter::Test::Stubs.new

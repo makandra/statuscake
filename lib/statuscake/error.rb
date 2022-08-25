@@ -3,10 +3,10 @@ class StatusCake::Error < StandardError
 
   def initialize(json)
     @json = json
-    super(json['Error'])
+    super(json['errors'])
   end
 
   def err_no
-    json['ErrNo'].to_i
+    json['errors']
   end
 end
