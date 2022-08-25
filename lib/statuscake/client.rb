@@ -1,33 +1,10 @@
 class StatusCake::Client
-  ENDPOINT = 'https://app.statuscake.com'
+  ENDPOINT = 'https://api.statuscake.com/v1'
   USER_AGENT = "Ruby StatusCake Client #{StatusCake::VERSION}"
 
-  DEFAULT_ADAPTERS = [
-    Faraday::Adapter::NetHttp,
-    Faraday::Adapter::Test
-  ]
-
   OPTIONS = [
-    :API,
-    :Username,
+    :API_KEY
   ]
-
-  APIs = {
-    '/API/Alerts'               => {:method => :get},
-    '/API/ContactGroups/Update' => {:method => :put},
-    '/API/ContactGroups'        => {:method => :get},
-    '/API/Tests/Checks'         => {:method => :get},
-    '/API/Tests/Periods'        => {:method => :get},
-    '/API/Tests'                => {:method => :get},
-    '/API/Tests/Details'        => {:method => :get},
-    # Delete test when HTTP method is "DELETE"
-    # see https://www.statuscake.com/api/Tests/Deleting%20a%20Test.md
-    '/API/Tests/Update'         => {:method => :put},
-    '/API/Locations/json'       => {:method => :get, :alias => :locations},
-    '/API/Locations/txt'        => {:method => :get},
-    '/API/Locations/xml'        => {:method => :get},
-    '/API/Auth'                 => {:method => :get},
-  }
 
   def initialize(options)
     @options = {}
@@ -40,37 +17,73 @@ class StatusCake::Client
 
     @conn = Faraday.new(options) do |faraday|
       faraday.request  :url_encoded
-      faraday.response :json, :content_type => /\bjson$/
+      faraday.response :json, content_type: /\bjson$/
       faraday.response :raise_error
 
       yield(faraday) if block_given?
-
-      unless DEFAULT_ADAPTERS.any? {|i| faraday.builder.handlers.include?(i) }
-        faraday.adapter Faraday.default_adapter
-      end
     end
 
     @conn.headers[:user_agent] = USER_AGENT
   end
 
-  APIs.each do |path, attrs|
-    names = [path.sub(%r|\A/API/|, '').gsub('/', '_').downcase]
-    names << attrs[:alias] if attrs.has_key?(:alias)
-    method = attrs[:method]
+  def list_uptime_tests(params = {})
+    params = { limit: 100 }.merge(params)
+    response = request('uptime', :get, params)
+    uptime_checks = response['data']
 
-    names.each do |name|
-      class_eval <<-EOS, __FILE__, __LINE__ + 1
-        def #{name}(params = {})
-          method = params.delete(:method) || #{method.inspect}
-          request(#{path.inspect}, method, params)
-        end
-      EOS
+    page_count = response['metadata']['page_count']
+    (2..page_count).each do |page|
+      params['page'] = page
+      page_response = request('uptime', :get, params)
+      uptime_checks.concat(page_response['data'])
     end
+
+    uptime_checks
+  end
+
+  def create_uptime_test(params)
+    %i[website_url test_type name check_rate].each do |param|
+      raise ArgumentError, "#{param} is a required parameter, but was not given." if params[param].nil?
+    end
+
+    request('uptime', :post, params)
+  end
+
+  def get_uptime_test_id(name)
+    checks_filtered_by_name = list_uptime_tests.select { |uptime_check| uptime_check['name'] == name }
+    checks_filtered_by_name.map { |uptime_check| uptime_check['id'] }
+  end
+
+  def get_uptime_test(test_id, params = {})
+    request("uptime/#{test_id}", :get, params)
+  end
+
+  def update_uptime_test(test_id, params)
+    raise ArgumentError, 'No parameters were set to update.' if params.empty?
+
+    request("uptime/#{test_id}", :put, params)
+  end
+
+  def delete_uptime_test(test_id, params = {})
+    request("uptime/#{test_id}", :delete, params)
+  end
+
+  def list_uptime_test_history(test_id, params = {})
+    request("uptime/#{test_id}/history", :get, params)
+  end
+
+  def list_uptime_test_periods(test_id, params = {})
+    request("uptime/#{test_id}/periods", :get, params)
+  end
+
+  def list_uptime_test_alerts(test_id, params = {})
+    request("uptime/#{test_id}/alerts", :get, params)
   end
 
   private
 
   def request(path, method, params = {})
+    path = "#{ENDPOINT}/#{path}"
     response = @conn.send(method) do |req|
       req.url path
 
@@ -83,19 +96,10 @@ class StatusCake::Client
         raise 'must not happen'
       end
 
-      req.headers[:API] = @options[:API]
-      req.headers[:Username] = @options[:Username]
+      req.headers[:Authorization] = "Bearer #{@options[:API_KEY]}"
       yield(req) if block_given?
     end
 
-    json = response.body
-    validate_response(json)
-    json
-  end
-
-  def validate_response(json)
-    if json.kind_of?(Hash) and json.has_key?('ErrNo')
-      raise StatusCake::Error.new(json)
-    end
+    response.body
   end
 end

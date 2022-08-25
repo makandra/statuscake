@@ -1,24 +1,16 @@
 require 'statuscake'
 require 'uri'
+require 'byebug'
 
-TEST_API_KEY  = 'l6OxVJilcD2cETMoNRvn'
-TEST_USERNAME = 'StatusCake'
+TEST_API_KEY = 'ReallySecretAPIToken'
 
-def status_cake(options = {})
+def stub_client(options = {}, &block)
   options = {
-    API:      TEST_API_KEY,
-    Username: TEST_USERNAME,
+    API_KEY: TEST_API_KEY
   }.merge(options)
 
   stubs = Faraday::Adapter::Test::Stubs.new
-
   described_class.new(options) do |faraday|
-    faraday.adapter :test, stubs do |stub|
-      yield(stub)
-    end
+    faraday.adapter :test, stubs, &block
   end
-end
-
-def stringify_hash(hash)
-  Hash[*hash.map {|k, v| [k.to_s, v.to_s] }.flatten(1)]
 end
