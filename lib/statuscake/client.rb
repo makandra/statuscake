@@ -1,7 +1,9 @@
+require 'byebug'
+require 'active_support/core_ext/string'
+
 class StatusCake::Client
   ENDPOINT = 'https://api.statuscake.com/v1'
-  USER_AGENT = "Ruby StatusCake Client 0.2.0"
-  #USER_AGENT = "Ruby StatusCake Client #{StatusCake::VERSION}"
+  USER_AGENT = "Ruby StatusCake Client #{StatusCake::VERSION}"
 
   DEFAULT_ADAPTERS = [
     Faraday::Adapter::NetHttp,
@@ -26,6 +28,7 @@ class StatusCake::Client
       faraday.request  :url_encoded
       faraday.response :json, :content_type => /\bjson$/
       faraday.response :raise_error
+      faraday.response :logger, nil, { headers: true, bodies: true }
 
       yield(faraday) if block_given?
 
@@ -35,68 +38,85 @@ class StatusCake::Client
     end
 
     @conn.headers[:user_agent] = USER_AGENT
+    # uptime_checks
   end
 
-  def uptime_create(identifier, params = {})
-    method = params.delete(:method) || :post
-    gather_uptime_tests
-    # if identifier is an Integer, search for test_id
-    # if identifier is a String search for name and get test_id
-
-    request("#{ENDPOINT}/uptime/#{test_id}", method, params)
-  end
-
-  def uptime_delete(identifier, params = {})
-    method = params.delete(:method) || :delete
-    gather_uptime_tests
-    # if identifier is an Integer, search for test_id
-    # if identifier is a String search for name and get test_id
-
-    request("#{ENDPOINT}/uptime/#{test_id}", method, params)
-  end
-
-  def uptime_update(identifier, params = {})
-    method = params.delete(:method) || :put
-    gather_uptime_tests
-    # if identifier is an Integer, search for test_id
-    # if identifier is a String search for name and get test_id
-
-    request("#{ENDPOINT}/uptime/#{test_id}", method, params)
-  end
-
-  #private
-
-  def gather_uptime_tests(params = {limit: 100})
-    method = params.delete(:method) || :get
-    data = []
-    page_count = nil
-    total_count = nil
-
-    puts "GETTING PAGE 1"
-    res = request("#{ENDPOINT}/uptime", method, params)
-    data += res['data']
-
-    page_count = res['metadata']['page_count']
-    total_count = res['metadata']['total_count']
-
-    # We're assuming there is no change in page count, while this runs
-    for page in 2..page_count do
-      puts "GETTING PAGE #{page} of #{page_count}"
-      page_params = params
-      page_params['page'] = page
-      page_res = request("#{ENDPOINT}/uptime", method, page_params)
-      data += page_res['data']
+  def create_uptime(params = {})
+    [:website_url, :test_type, :name, :check_rate].each do |param|
+      if params[param].nil?
+        raise ArgumentError, "#{param.to_s.humanize} has to be given as parameter."
+      end
     end
 
-    puts "Test if received amount of data is correct:"
-    puts "We got this count of entries: #{data.size}"
-    puts "StatusCake sees this count:   #{total_count}"
-    # XXX Raise error if these numbers are not equal
+    request("#{ENDPOINT}/uptime/", :post, params)
+  end
+
+  def test_id(name)
+
+  end
+
+  def retrieve_uptime_check(test_id, params = {})
+    type_check test_id
+
+    request("#{ENDPOINT}/uptime/#{test_id}", :get, params)
+  end
+
+  def update_uptime(test_id, params = {})
+    type_check test_id
+    if params.empty?
+      raise ArgumentError, "No parameters were set to update."
+    end
+
+    request("#{ENDPOINT}/uptime/#{test_id}", :put, params)
+  end
+
+  def delete_uptime(test_id, params = {})
+    type_check test_id
+
+    request("#{ENDPOINT}/uptime/#{test_id}", :delete, params)
+  end
+
+  def uptime_check_history(test_id, params = {})
+    type_check test_id
+
+    request("#{ENDPOINT}/uptime/#{test_id}/history", :get, params)
+  end
+
+  def uptime_check_periods(test_id, params = {})
+    type_check test_id
+
+    request("#{ENDPOINT}/uptime/#{test_id}/periods", :get, params)
+  end
+
+  def uptime_check_alerts(test_id, params = {})
+    type_check test_id
+
+    request("#{ENDPOINT}/uptime/#{test_id}/alerts", :get, params)
+  end
+
+  def uptime_checks(params = {limit: 100})
+    @data = []
+    response = request("#{ENDPOINT}/uptime", :get, params)
 
     # cache the data so we don't have to talk to the API too often
-    @data = data
+    @data.concat response['data']
 
-    data
+    page_count = response['metadata']['page_count']
+    for page in 2..page_count do
+      params['page'] = page
+      page_response = request("#{ENDPOINT}/uptime", :get, params)
+      @data.concat page_response['data']
+    end
+
+    @data
+  end
+
+  private
+
+  def type_check(test_id)
+    if test_id.class != String || test_id.class != Integer
+      raise ArgumentError, "Test Id was of type #{test_id.class}, but has to be of type Integer or String."
+    end
   end
 
   def request(path, method, params = {})
