@@ -4,7 +4,7 @@ require 'byebug'
 
 TEST_API_KEY  = 'l6OxVJilcD2cETMoNRvn'
 
-def status_cake(options = {})
+def stub_client(options = {})
   options = {
     API_KEY: TEST_API_KEY,
   }.merge(options)

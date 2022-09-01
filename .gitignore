@@ -13,3 +13,5 @@
 *.a
 mkmf.log
 test.rb
+.byebug_history
+.idea

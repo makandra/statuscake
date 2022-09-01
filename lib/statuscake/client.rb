@@ -60,13 +60,10 @@ class StatusCake::Client
   end
 
   def retrieve_uptime_check(test_id, params = {})
-    type_check test_id
-
     request("uptime/#{test_id}", :get, params)
   end
 
   def update_uptime(test_id, params = {})
-    type_check test_id
     if params.empty?
       raise ArgumentError, "No parameters were set to update."
     end
@@ -75,36 +72,22 @@ class StatusCake::Client
   end
 
   def delete_uptime(test_id, params = {})
-    type_check test_id
-
     request("uptime/#{test_id}", :delete, params)
   end
 
   def uptime_check_history(test_id, params = {})
-    type_check test_id
-
     request("uptime/#{test_id}/history", :get, params)
   end
 
   def uptime_check_periods(test_id, params = {})
-    type_check test_id
-
     request("uptime/#{test_id}/periods", :get, params)
   end
 
   def uptime_check_alerts(test_id, params = {})
-    type_check test_id
-
     request("uptime/#{test_id}/alerts", :get, params)
   end
 
   private
-
-  def type_check(test_id)
-    if test_id.class != String && test_id.class != Integer
-      raise ArgumentError, "Test Id was of type #{test_id.class}, but has to be of type Integer or String."
-    end
-  end
 
   def request(path, method, params = {})
     path = "#{ENDPOINT}/#{path}"
