@@ -2,7 +2,7 @@ require 'statuscake'
 require 'uri'
 require 'byebug'
 
-TEST_API_KEY  = 'l6OxVJilcD2cETMoNRvn'
+TEST_API_KEY  = 'ReallySecretAPIToken'
 
 def stub_client(options = {})
   options = {

@@ -2,7 +2,7 @@ describe StatusCake::Client do
   let(:request_headers) do
     {
       "User-Agent"    => "Ruby StatusCake Client 0.2.0",
-      "Authorization" => "Bearer l6OxVJilcD2cETMoNRvn"
+      "Authorization" => "Bearer #{TEST_API_KEY}"
     }
   end
 
@@ -14,7 +14,14 @@ describe StatusCake::Client do
 
 
   describe 'get /uptime' do
-    let(:params) { {} }
+    let(:client) do
+      stub_client do |stub|
+        stub.get('https://api.statuscake.com/v1/uptime') do |env|
+          expect(env.request_headers).to eq request_headers
+          [200, {'Content-Type': 'application/json'}, JSON.dump(response)]
+        end
+      end
+    end
 
     let(:response) do
       {
@@ -42,24 +49,11 @@ describe StatusCake::Client do
     end
 
     it 'returns one page of uptime checks' do
-      client = stub_client do |stub|
-        stub.get('https://api.statuscake.com/v1/uptime') do |env|
-          expect(env.request_headers).to eq request_headers
-          [200, {'Content-Type': 'application/json'}, JSON.dump(response)]
-        end
-      end
-
       expect(client.uptime_checks).to eq response[:data]
     end
 
     it 'returns several pages of uptime checks' do
       response[:metadata][:page_count] = 3
-      client = stub_client do |stub|
-        stub.get('https://api.statuscake.com/v1/uptime') do |env|
-          expect(env.request_headers).to eq request_headers
-          [200, {'Content-Type': 'application/json'}, JSON.dump(response)]
-        end
-      end
 
       uptime_checks = []
       3.times { uptime_checks.concat(response[:data]) }
@@ -174,26 +168,145 @@ describe StatusCake::Client do
   end
 
   describe 'put /uptime/test_id' do
-    it 'updates an uptime check' do
-      client = stub_client do |stub|
+    let (:client) do
+      stub_client do |stub|
         stub.put('https://api.statuscake.com/v1/uptime/6489923') do |env|
           expect(env.request_headers).to eq request_headers.merge(form_request_headers)
           [200, {'Content-Type': 'application/json'}, " "]
         end
       end
+    end
 
+    it 'updates an uptime check' do
       expect(client.update_uptime(6489923, {name: "example"})).to eq nil
+    end
+
+    it 'raises an error that no parameters were given' do
+      expect { client.update_uptime(6489923, {}) }.to raise_error ArgumentError, "No parameters were set to update."
     end
   end
 
-  it 'raises an error that no parameters were given' do
-    client = stub_client do |stub|
-      stub.put('https://api.statuscake.com/v1/uptime/6489923') do |env|
-        expect(env.request_headers).to eq request_headers.merge(form_request_headers)
-        [200, {'Content-Type': 'application/json'}, " "]
-      end
+
+  describe 'get /uptime/test_id/history' do
+    let(:response) do
+      {
+        "data"=>
+          [
+            {
+              "created_at"=>"2022-09-05T06:07:02+00:00",
+             "status_code"=>200,
+             "location"=>"XAK",
+             "performance"=>27
+            }, {
+              "created_at"=>"2022-09-05T06:05:55+00:00",
+              "status_code"=>200,
+              "location"=>"YBP",
+              "performance"=>340
+            }, {
+              "created_at"=>"2022-09-05T06:03:59+00:00",
+              "status_code"=>200,
+              "location"=>"SKW",
+              "performance"=>194
+            }
+          ],
+        "links"=>
+          {
+            "self"=>"https://api.statuscake.com/v1/uptime/6489923/history?limit=25&before=1662358051",
+            "next"=>"https://api.statuscake.com/v1/uptime/6489923/history?limit=25&before=1662356356"
+          }
+      }
     end
 
-    expect { client.update_uptime(6489923, {}) }.to raise_error ArgumentError, "No parameters were set to update."
+    it do
+      client = stub_client do |stub|
+        stub.get('https://api.statuscake.com/v1/uptime/6489923/history') do |env|
+          expect(env.request_headers).to eq request_headers
+          [200, {'Content-Type': 'application/json'}, response]
+        end
+      end
+
+      expect(client.uptime_check_history(6489923)).to eq(response)
+    end
+  end
+
+  describe 'get /uptime/test_id/periods' do
+    let(:response) do
+      {
+        "data"=>
+          [
+            {
+              "status"=>"up",
+              "created_at"=>"2022-09-01T14:25:46+00:00"
+            }
+          ], "links"=>
+          {
+            "self"=>"https://api.statuscake.com/v1/uptime/6489923/periods?limit=25&before=1662359177",
+            "next"=>"https://api.statuscake.com/v1/uptime/6489923/periods?limit=25&before=1662042346"
+          }
+      }
+    end
+
+    it do
+      client = stub_client do |stub|
+        stub.get('https://api.statuscake.com/v1/uptime/6489923/periods') do |env|
+          expect(env.request_headers).to eq request_headers
+          [200, {'Content-Type': 'application/json'}, response]
+        end
+      end
+
+      expect(client.uptime_check_periods(6489923)).to eq(response)
+    end
+  end
+
+  describe 'get /uptime/test_id/alerts' do
+    let(:response) do
+      {
+        "data"=>
+          [
+            {
+              "id"=>"6203700",
+              "status"=>"up",
+              "status_code"=>100,
+              "triggered_at"=>"2022-01-30T23:28:09+00:00"
+            },
+            {
+              "id"=>"6203700",
+              "status"=>"down",
+              "status_code"=>0,
+              "triggered_at"=>"2022-01-30T23:26:59+00:00"
+            }
+          ],
+        "links"=>
+          {
+            "self"=>"https://api.statuscake.com/v1/uptime/6489923/alerts?limit=25&before=1662359526",
+            "next"=>"https://api.statuscake.com/v1/uptime/6489923/alerts?limit=25&before=1643585219"
+          }
+      }
+    end
+
+    it do
+      client = stub_client do |stub|
+        stub.get('https://api.statuscake.com/v1/uptime/6489923/alerts') do |env|
+          expect(env.request_headers).to eq request_headers
+          [200, {'Content-Type': 'application/json'}, response]
+        end
+      end
+
+      expect(client.uptime_check_alerts(6489923)).to eq(response)
+    end
+  end
+
+
+  describe 'delete /uptime/test_id' do
+    it do
+      client = stub_client do |stub|
+        stub.delete('https://api.statuscake.com/v1/uptime/6489923') do |env|
+          expect(env.request_headers).to eq request_headers
+          [200, {'Content-Type': 'application/json'}, ""]
+        end
+      end
+
+      expect(client.delete_uptime(6489923)).to eq nil
+    end
   end
 end
