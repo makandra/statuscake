@@ -1,5 +1,3 @@
-require 'byebug'
-
 class StatusCake::Client
   ENDPOINT = 'https://api.statuscake.com/v1'
   USER_AGENT = "Ruby StatusCake Client #{StatusCake::VERSION}"
@@ -21,7 +19,6 @@ class StatusCake::Client
       faraday.request  :url_encoded
       faraday.response :json, :content_type => /\bjson$/
       faraday.response :raise_error
-      faraday.response :logger, nil, { headers: true, bodies: true }
 
       yield(faraday) if block_given?
     end
