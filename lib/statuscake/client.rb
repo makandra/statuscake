@@ -3,7 +3,7 @@ class StatusCake::Client
   USER_AGENT = "Ruby StatusCake Client #{StatusCake::VERSION}"
 
   OPTIONS = [
-    :API_KEY,
+    :API_KEY
   ]
 
   def initialize(options)
@@ -17,7 +17,7 @@ class StatusCake::Client
 
     @conn = Faraday.new(options) do |faraday|
       faraday.request  :url_encoded
-      faraday.response :json, :content_type => /\bjson$/
+      faraday.response :json, content_type: /\bjson$/
       faraday.response :raise_error
 
       yield(faraday) if block_given?
@@ -26,61 +26,57 @@ class StatusCake::Client
     @conn.headers[:user_agent] = USER_AGENT
   end
 
-  def uptime_checks(params = {})
-    params = {limit: 100}.merge(params)
-    response = request("uptime", :get, params)
+  def list_uptime_tests(params = {})
+    params = { limit: 100 }.merge(params)
+    response = request('uptime', :get, params)
     uptime_checks = response['data']
 
     page_count = response['metadata']['page_count']
-    for page in 2..page_count do
+    (2..page_count).each do |page|
       params['page'] = page
-      page_response = request("uptime", :get, params)
-      uptime_checks.concat page_response['data']
+      page_response = request('uptime', :get, params)
+      uptime_checks.concat(page_response['data'])
     end
 
     uptime_checks
   end
 
-  def create_uptime(params = {})
-    [:website_url, :test_type, :name, :check_rate].each do |param|
-      if params[param].nil?
-        raise ArgumentError, "#{param.to_s.humanize} is a required parameter, but was not given."
-      end
+  def create_uptime_test(params)
+    %i[website_url test_type name check_rate].each do |param|
+      raise ArgumentError, "#{param} is a required parameter, but was not given." if params[param].nil?
     end
 
-    request("uptime", :post, params)
+    request('uptime', :post, params)
   end
 
   def uptime_test_id(name)
-    checks_filtered_by_name = uptime_checks.select { |uptime_check| uptime_check['name'] == name }
+    checks_filtered_by_name = list_uptime_tests.select { |uptime_check| uptime_check['name'] == name }
     checks_filtered_by_name.map { |uptime_check| uptime_check['id'] }
   end
 
-  def retrieve_uptime_check(test_id, params = {})
+  def get_uptime_test(test_id, params = {})
     request("uptime/#{test_id}", :get, params)
   end
 
-  def update_uptime(test_id, params = {})
-    if params.empty?
-      raise ArgumentError, "No parameters were set to update."
-    end
+  def update_uptime_test(test_id, params)
+    raise ArgumentError, 'No parameters were set to update.' if params.empty?
 
     request("uptime/#{test_id}", :put, params)
   end
 
-  def delete_uptime(test_id, params = {})
+  def delete_uptime_test(test_id, params = {})
     request("uptime/#{test_id}", :delete, params)
   end
 
-  def uptime_check_history(test_id, params = {})
+  def list_uptime_test_history(test_id, params = {})
     request("uptime/#{test_id}/history", :get, params)
   end
 
-  def uptime_check_periods(test_id, params = {})
+  def list_uptime_test_periods(test_id, params = {})
     request("uptime/#{test_id}/periods", :get, params)
   end
 
-  def uptime_check_alerts(test_id, params = {})
+  def list_uptime_test_alerts(test_id, params = {})
     request("uptime/#{test_id}/alerts", :get, params)
   end
 
@@ -100,7 +96,7 @@ class StatusCake::Client
         raise 'must not happen'
       end
 
-      req.headers[:Authorization] = "Bearer " + @options[:API_KEY]
+      req.headers[:Authorization] = "Bearer #{@options[:API_KEY]}"
       yield(req) if block_given?
     end
 
